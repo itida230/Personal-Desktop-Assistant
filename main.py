@@ -1,121 +1,132 @@
+import speech_recognition as sr
 import pyttsx3
 import datetime
-import speech_recognition as sr
 import wikipedia
 import webbrowser
-import random
 import os
-from ctypes import cast, POINTER
-from comtypes import CLSCTX_ALL, CoInitialize
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-from googletrans import Translator
-import schedule
-import re
-import time
 
-engine = pyttsx3.init('sapi5')
-engine.setProperty('voice', engine.getProperty('voices')[0].id)
+r = sr.Recognizer()
+engine = pyttsx3.init()
 
-def speak(audio):
-    engine.say(audio)
+voices = engine.getProperty('voices')
+for voice in voices:
+    if "female" in voice.name.lower():
+        engine.setProperty('voice', voice.id)
+        break
+
+USER_NAME = "Aditi"
+
+def speak(text):
+    engine.say(text)
     engine.runAndWait()
 
 def wish_me():
-    hour = datetime.datetime.now().hour
+    hour = int(datetime.datetime.now().hour)
     if 0 <= hour < 12:
-        speak("Good Morning!")
+        speak(f"Good morning {USER_NAME}!")
     elif 12 <= hour < 18:
-        speak("Good Afternoon!")
+        speak(f"Good afternoon {USER_NAME}!")
     else:
-        speak("Good Evening!")
-    speak("I am Tom! Please tell me how may I help you.")
+        speak(f"Good evening {USER_NAME}!")
+    speak("I am your assistant. How can I help you today?")
 
 def take_command():
-    r = sr.Recognizer()
     with sr.Microphone() as source:
         print("Listening...")
+        r.pause_threshold = 1
         audio = r.listen(source)
+
     try:
         print("Recognizing...")
-        return r.recognize_google(audio, language='en-in').lower()
+        query = r.recognize_google(audio, language='en-in')
+        print(f"User said: {query}")
     except Exception:
         print("Say that again please...")
         return "None"
+    return query.lower()
 
-def set_volume(change_percentage, increase=True):
-    CoInitialize()
-    devices = AudioUtilities.GetSpeakers()
-    volume = cast(devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None), POINTER(IAudioEndpointVolume))
-    current_volume = volume.GetMasterVolumeLevelScalar()
-    change_fraction = change_percentage / 100.0
-    new_volume = min(1.0, current_volume + change_fraction) if increase else max(0.0, current_volume - change_fraction)
-    volume.SetMasterVolumeLevelScalar(new_volume, None)
-    action = "increased" if increase else "decreased"
-    speak(f"Volume {action} by {change_percentage}%!")
+wish_me()
 
-def translate_text():
-    speak("What text would you like to translate?")
-    text_to_translate = take_command()
-    speak("To which language would you like to translate?")
-    target_language = take_command()
-    translated_text = Translator().translate(text_to_translate, dest=target_language)
-    speak(f"The translation to {target_language} is: {translated_text.text}")
+while True:
+    query = take_command()
+    if query == "none":
+        continue
 
-def set_reminder():
-    speak("What task would you like to set a reminder for?")
-    task = take_command()
-    speak("When would you like to be reminded? Please specify the time (in HH:MM format).")
-    reminder_time = take_command()
-    if re.match(r'^\d{2}:\d{2}$', reminder_time):
-        schedule.every().day.at(reminder_time).do(lambda: speak(f"Reminder: {task}"))
-    else:
-        speak("Invalid time format. Please use HH:MM format.")
+    greetings = ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"]
+    if any(word in query for word in greetings):
+        speak(f"Hello {USER_NAME}, nice to see you!")
+        continue
 
-if __name__ == "__main__":
-    wish_me()
-    while True:
-        query = take_command()
+    elif 'how are you' in query:
+        speak("I'm doing great, thank you for asking!")
+        continue
 
-        if 'wikipedia' in query:
+    elif 'what is my name' in query:
+        speak(f"Your name is {USER_NAME}!")
+        continue
+
+    elif 'who are you' in query:
+        speak("I am your personal assistant, created to help you with tasks.")
+        continue
+
+    elif 'wikipedia' in query:
+        search_term = query.replace('wikipedia', '').strip()
+        if not search_term:
+            speak("Please tell me what to search on Wikipedia.")
+        else:
             speak("Searching Wikipedia...")
-            results = wikipedia.summary(query.replace('wikipedia', ''), sentences=2)
-            speak(f"According to Wikipedia: {results}")
+            try:
+                results = wikipedia.summary(search_term, sentences=2)
+                speak("According to Wikipedia")
+                speak(results)
+            except wikipedia.DisambiguationError:
+                speak(f"Your query '{search_term}' has multiple meanings. Please be more specific.")
+            except wikipedia.PageError:
+                speak("I couldn't find anything on Wikipedia.")
+            except wikipedia.WikipediaException:
+                speak("Sorry, something went wrong with Wikipedia.")
+        continue
 
-        elif 'the time' in query:
-            speak(f"Sir, the time is {datetime.datetime.now().strftime('%H:%M:%S')}")
+    elif 'time' in query:
+        current_time = datetime.datetime.now().strftime('%H:%M:%S')
+        speak(f"The time is {current_time}")
+        continue
 
-        elif 'play music' in query:
-            music_dir = 'D:\\songs'
-            os.startfile(os.path.join(music_dir, random.choice(os.listdir(music_dir))))
+    if 'youtube' in query:
+        speak("Opening YouTube")
+        webbrowser.open("https://www.youtube.com")
+        continue
 
-        elif 'increase volume' in query:
-            speak("Enter the percentage by which to increase the volume:")
-            set_volume(float(take_command()), increase=True)
+    if 'google' in query:
+        speak("Opening Google")
+        webbrowser.open("https://www.google.com")
+        continue
 
-        elif 'decrease volume' in query:
-            speak("Enter the percentage by which to decrease the volume:")
-            set_volume(float(take_command()), increase=False)
+    if 'netflix' in query:
+        speak("Opening Netflix")
+        webbrowser.open("https://www.netflix.com/browse")
+        continue
 
-        elif 'open website' in query:
-            speak("Sure, please specify the website.")
-            webbrowser.open(take_command())
+    if 'spotify' in query:
+        speak("Opening Spotify")
+        webbrowser.open("https://open.spotify.com")
+        continue
 
-        elif 'tell joke' in query:
-            speak("You are a very funny joke in yourself. I laugh very hard looking at you every time HAHAHAHA")
+    if 'music' in query or 'play music' in query:
+        music_dir = "C:\\Users\\Public\\Music"
+        try:
+            songs = os.listdir(music_dir)
+            if songs:
+                speak("Playing music")
+                os.startfile(os.path.join(music_dir, songs[0]))
+            else:
+                speak("No music files found in your music directory.")
+        except Exception:
+            speak("Sorry, I could not find your music folder.")
+        continue
 
-        elif 'search web' in query:
-            speak("Sure, what would you like to search for?")
-            webbrowser.open(f"https://www.google.com/search?q={take_command()}")
+    if 'exit' in query or 'quit' in query or 'stop' in query:
+        speak(f"Goodbye {USER_NAME}! Have a great day!")
+        break
 
-        elif 'translate text' in query:
-            translate_text()
-
-        elif 'set reminder' in query:
-            set_reminder()
-
-        elif 'bye' in query:
-            speak('Goodbye! Have a nice day!')
-            break
-
-        schedule.run_pending()
-        time.sleep(1)
+    speak("I didn't understand that. Please try again.")
